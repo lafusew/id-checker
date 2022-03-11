@@ -44,13 +44,6 @@ func main() {
 	}
 
 	fmt.Println(borrowers)
-
-	// s1 := "Antoine"
-	// s2 := "NtineAo"
-	// distance := levenshtein.ComputeDistance(s1, s2)
-	// fmt.Printf("The distance between %s and %s is %d.\n", s1, s2, distance)
-
-	// // getClientToken()
 }
 
 func connectDatabase() (*sql.DB, error) {
