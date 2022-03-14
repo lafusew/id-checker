@@ -38,12 +38,32 @@ func main() {
 		panic(err.Error())
 	}
 
-	borrowers, err := rowsToStructs(rows)
+	_, err = rowsToStructs(rows)
 	if err != nil {
 		panic(err.Error())
 	}
 
-	fmt.Println(borrowers)
+	token, err := getClientToken()
+	if err != nil {
+		panic(err.Error())
+	}
+
+	code, err := getUserCode(token, 18)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	userToken, err := getUserTokenFromCode(code)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	availableIdentities, err := getAvailableUserIdentity(userToken)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	fmt.Printf("\n %+v \n", availableIdentities)
 }
 
 func connectDatabase() (*sql.DB, error) {
