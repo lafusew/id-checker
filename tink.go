@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -8,6 +9,8 @@ import (
 	"os"
 	"strconv"
 	"strings"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Token struct {
@@ -23,14 +26,18 @@ type UserCode struct {
 	Code string `json:"code"`
 }
 
-type IdentitiesResp struct {
-	Identity []struct {
-		Name string `json:"name"`
-		Ssn string `json:"ssn"`
-		BirthDate string `json:"dateOfBirth"`
-		BankProvider string `json:"providerName"`
- 	} `json:"availableIdentityData"`
+type Identity struct {
+	Name string `json:"name"`
+	Ssn string `json:"ssn"`
+	BirthDate string `json:"dateOfBirth"`
+	BankProvider string `json:"providerName"`
 }
+
+type IdentitiesResp struct {
+	Identities []Identity `json:"availableIdentityData"`
+}
+
+var db *sql.DB
 
 func getClientToken() (Token, error){
 	data := url.Values{}
@@ -152,4 +159,55 @@ func getAvailableUserIdentity(token Token) (IdentitiesResp, error){
  	}
 
 	return b, err
+}
+
+func initLocalDatabase() error {
+	var err error
+
+	db, err = sql.Open("sqlite3", "./tink.db")
+
+	if err != nil {
+		return err
+	}
+
+	createTableSQL := `CREATE TABLE IF NOT EXISTS tink (
+		"id" INTEGER NOT NULL,
+		"name" TEXT,
+		"ssn" TEXT,
+		"dateOfBirth" TEXT,
+		"providerName" TEXT
+	);`
+
+	statement, err := db.Prepare(createTableSQL)
+	if err != nil {
+		return err
+	}
+
+	statement.Exec()
+
+	return err
+}
+
+func insertLocalDatabase(tinkRes IdentitiesResp, mbId int) error {
+	insertCredSQL := `INSERT INTO tink (id, name, ssn, dateOfBirth, providerName) VALUES (?, ?, ?, ?, ?)`
+	statement, err := db.Prepare(insertCredSQL)
+	if err != nil {
+		return err
+	} else {
+		defer statement.Close()
+	}
+
+	for _, v := range tinkRes.Identities {
+		if err != nil {
+			return err
+		}
+
+		_, err := statement.Exec(mbId, v.Name, v.Ssn, v.BirthDate, v.BankProvider)
+		if err != nil {
+			return err
+		}
+	}
+
+
+	return nil
 }

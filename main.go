@@ -1,24 +1,19 @@
 package main
 
 import (
-	"database/sql"
 	"fmt"
 	"os"
 
-	"github.com/go-sql-driver/mysql"
 	"github.com/joho/godotenv"
 )
 
-type SqlBorrower struct {
-	id        int
-	firstName sql.NullString
-	lastName  sql.NullString
-}
-
-type Borrower struct {
-	id        int
-	firstName string
-	lastName  string
+type IdentityCheck struct {
+	mbClientId int
+	mbFullName string
+	mbBirthDate string
+	tinkFullName string
+	tinkBirthDate string
+	levenshteinDistance int
 }
 
 func main() {
@@ -38,7 +33,7 @@ func main() {
 		panic(err.Error())
 	}
 
-	_, err = rowsToStructs(rows)
+	borrowers, err := rowsToStructs(rows)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -48,81 +43,63 @@ func main() {
 		panic(err.Error())
 	}
 
-	code, err := getUserCode(token, 18)
+	err = initLocalDatabase()
 	if err != nil {
 		panic(err.Error())
 	}
 
-	userToken, err := getUserTokenFromCode(code)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	availableIdentities, err := getAvailableUserIdentity(userToken)
-	if err != nil {
-		panic(err.Error())
-	}
-
-	fmt.Printf("\n %+v \n", availableIdentities)
-}
-
-func connectDatabase() (*sql.DB, error) {
-	cfg := mysql.Config{
-		User:                 os.Getenv("MYSQL_USER"),
-		Passwd:               os.Getenv("MYSQL_PWD"),
-		Net:                  "tcp",
-		Addr:                 os.Getenv("MYSQL_HOST"),
-		DBName:               os.Getenv("MYSQL_DB"),
-		AllowNativePasswords: true,
-	}
-
-	db, err := sql.Open("mysql", cfg.FormatDSN())
-	if err != nil {
-		return nil, err
-	}
-
-	return db, err
-}
-
-func queryIdentity(db *sql.DB) (*sql.Rows, error) {
-	fmt.Print("\nSQL QUERY STARTED 🏁 \n\n")
-
-	results, err := db.Query("SELECT id, firstName, lastName FROM client")
-	if err != nil {
-		return nil, err
-	}
-
-	return results, err
-}
-
-func rowsToStructs(rows *sql.Rows) ([]Borrower, error) {
-
-	var borrowers []Borrower
-	for rows.Next() {
-		var sqlBorrower SqlBorrower
-		var borrower Borrower
-
-		err := rows.Scan(&sqlBorrower.id, &sqlBorrower.firstName, &sqlBorrower.lastName)
+	for i, v := range borrowers {
+		code, err := getUserCode(token, v.id)
 		if err != nil {
-			return borrowers, nil
+			fmt.Println(err.Error())
+			continue
 		}
 
-		borrower.id = sqlBorrower.id
-
-		if !sqlBorrower.firstName.Valid {
-			borrower.firstName = ""
-		} else {
-			borrower.firstName = sqlBorrower.firstName.String
+		if code == "" {
+			continue 
+		}
+	
+		userToken, err := getUserTokenFromCode(code)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
+		}
+	
+		availableIdentities, err := getAvailableUserIdentity(userToken)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
 		}
 
-		if !sqlBorrower.lastName.Valid {
-			borrower.lastName = ""
-		} else {
-			borrower.lastName = sqlBorrower.lastName.String
+		err = insertLocalDatabase(availableIdentities, v.id)
+		if err != nil {
+			fmt.Println(err.Error())
+			continue
 		}
 
-		borrowers = append(borrowers, borrower)
+		fmt.Fprint(os.Stdout, "\r \r")
+		fmt.Printf("%d / %d", i, len(borrowers))
 	}
-
-	return borrowers, nil
 }
+
+// func compare(bor Borrower, tinkIdentity Identity) string {
+// 	mbFullName := fmt.Sprintf("%s %s", bor.firstName, bor.lastName)
+// 	tinkFullName := tinkIdentity.Name
+
+// 	return fmt.Sprintf("\nmb  : %s\ntink: %s \n", mbFullName, tinkFullName)
+// }
+
+
+// func createAndOpenTxt() *os.File {
+// 	err := ioutil.WriteFile("compare.txt", []byte("Quick print of all data:\n"), 0644)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+
+// 	file, err := os.OpenFile("compare.txt", os.O_APPEND|os.O_WRONLY, 0644)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+
+// 	return file
+// }
